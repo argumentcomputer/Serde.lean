@@ -72,8 +72,16 @@ open Command Serde
 
 open Serialize
 
--- TODO : Finish figuring this out
-def mkStructureSerializeFuns (_ : Context) (_ : Name) : TermElabM Syntax := pure .missing
+#check List.join
+
+def mkStructureSerializeFuns (header : Header) (ctx : Context) (declName : Name) : TermElabM Syntax := do
+  let fields := getStructureFieldsFlattened (← getEnv) declName (includeSubobjectFields := false)
+  let mut kvPairs : Array (TSyntax `term) := #[]
+  for field in fields do
+    let nameStr := Syntax.mkStrLit field.toString
+    dbg_trace nameStr
+    kvPairs := kvPairs.push (← ``(($nameStr:str, Serialize.serialize $(mkIdent <| header.targetNames[0]! ++ field))))
+  `(private def $(mkIdent ctx.auxFunNames[0]!):ident $header.binders:bracketedBinder* := objFromKV <| [$kvPairs,*])
 
 def mkAltRHS (funcID : Ident) (ctor : ConstructorVal) (binders : Array (Ident × Expr)) (userNames : Option (Array Name)): TermElabM Term := do
   let mkSerialize (id : Ident) (type : Expr) : TermElabM Term := do
@@ -125,18 +133,19 @@ def mkInductiveMatch (funcID : Ident) (header : Header) (declName : Name) : Term
    let altsArray : TSyntaxArray `Lean.Parser.Term.matchAlt := ⟨alts⟩
    `(match $[$discrs],* with $altsArray:matchAlt*)
 
-def mkInductiveSerializeFuns (ctx : Context) (declName : Name) : TermElabM Syntax := do
+def mkInductiveSerializeFuns (header: Header) (ctx : Context) (declName : Name) : TermElabM Syntax := do
   let funcID := mkIdent ctx.auxFunNames[0]!
-  let header ← mkHeader ``Serialize 1 ctx.typeInfos[0]!
+  
   let rhs ← mkInductiveMatch funcID header declName
   `(private partial def $funcID:ident $header.binders:bracketedBinder* := $rhs)
 
 def mkSerializeCmds (declName : Name) : TermElabM (Array Syntax) := do
   let ctx ← mkContext "serialize" declName
+  let header ← mkHeader ``Serialize 1 ctx.typeInfos[0]!
   if isStructure (← getEnv) declName then
-    return #[← mkStructureSerializeFuns ctx declName] ++ (← mkInstanceCmds ctx ``Serialize #[declName])
+    return #[← mkStructureSerializeFuns header ctx declName] ++ (← mkInstanceCmds ctx ``Serialize #[declName])
   else
-    return #[← mkInductiveSerializeFuns ctx declName] ++ (← mkInstanceCmds ctx ``Serialize #[declName])
+    return #[← mkInductiveSerializeFuns header ctx declName] ++ (← mkInstanceCmds ctx ``Serialize #[declName])
 
 def mkSerializeHandler (declNames : Array Name) : CommandElabM Bool := do
   if declNames.size > 1 then 

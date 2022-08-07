@@ -16,6 +16,9 @@ open test
 
 #eval Serialize.serialize (con3 4)
 
--- structure Howdy where
---   greeting : String
--- deriving Serialize
+structure Howdy where
+  greeting : String
+  goodbye : Nat
+deriving Serialize
+
+#eval Serialize.serialize (⟨"hi", 2⟩ : Howdy)
