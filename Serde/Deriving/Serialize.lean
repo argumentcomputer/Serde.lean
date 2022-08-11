@@ -1,20 +1,13 @@
 import Lean.Elab.Deriving.Basic
 import Lean.Elab.Deriving.Util
+import Serde.ForStdLib
 
 namespace Serde
 
-open Std in
-@[specialize] def toList : RBNode α (fun _ => β) → List (α × β)
-  | .leaf => []
-  | .node _ l k v r => toList l ++ [(k,v)] ++ toList r
-
-open Std in
-@[specialize] def fromList [Ord α] (abs : List (α × β)) : RBNode α (fun _ => β) := 
-  abs.foldr (fun (a, b) obj => obj.insert compare a b) .leaf
-
 section fake_serde
 
-open Std in
+open Std
+
 inductive Serde where
   | bool : Bool → Serde
   | num : Nat → Serde
