@@ -72,14 +72,11 @@ open Command Serde
 
 open Serialize
 
-#check List.join
-
 def mkStructureSerializeFuns (header : Header) (ctx : Context) (declName : Name) : TermElabM Syntax := do
   let fields := getStructureFieldsFlattened (← getEnv) declName (includeSubobjectFields := false)
   let mut kvPairs : Array (TSyntax `term) := #[]
   for field in fields do
     let nameStr := Syntax.mkStrLit field.toString
-    dbg_trace nameStr
     kvPairs := kvPairs.push (← ``(($nameStr:str, Serialize.serialize $(mkIdent <| header.targetNames[0]! ++ field))))
   `(private def $(mkIdent ctx.auxFunNames[0]!):ident $header.binders:bracketedBinder* := objFromKV <| [$kvPairs,*])
 
@@ -95,7 +92,7 @@ def mkAltRHS (funcID : Ident) (ctor : ConstructorVal) (binders : Array (Ident ×
       ``(objFromKV [($(quote ctor.name.getString!), $(← mkSerialize x t))])
     | xs, none =>
       let xs ← xs.mapM fun (x, t) => mkSerialize x t
-      ``(objFromKV [($(quote ctor.name.getString!), Serialize.arr #[$[$xs:term],*])])
+      ``(objFromKV [($(quote ctor.name.getString!), Serde.arr [$[$xs:term],*])])
     | xs, some userNames =>
       let xs ← xs.mapIdxM fun idx (x, t) => do
         `(($(quote userNames[idx]!.getString!), $(← mkSerialize x t)))
@@ -113,7 +110,7 @@ def mkOneMatch (funcID : Ident) (indVal : InductiveVal) (ctorInfo : ConstructorV
     let mut userNames := #[]
     for i in [:ctorInfo.numFields] do
       let x := xs[indVal.numParams + i]!
-      let localDecl ← getLocalDecl x.fvarId!
+      let localDecl ← FVarId.getDecl x.fvarId!
       if !localDecl.userName.hasMacroScopes then
         userNames := userNames.push localDecl.userName
       let a := mkIdent (← mkFreshUserName `a)
@@ -151,12 +148,12 @@ def mkSerializeHandler (declNames : Array Name) : CommandElabM Bool := do
   if declNames.size > 1 then 
     return false 
   else
-    let cmds ← liftTermElabM none <| mkSerializeCmds declNames[0]!
+    let cmds ← liftTermElabM $ mkSerializeCmds declNames[0]!
     cmds.forM elabCommand
     return true
 
 initialize
-  registerBuiltinDerivingHandler ``Serialize mkSerializeHandler
+  registerDerivingHandler ``Serialize mkSerializeHandler
 
 end Lean.Elab.Deriving.Foo
 

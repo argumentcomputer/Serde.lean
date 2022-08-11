@@ -6,7 +6,12 @@ inductive test where
   | con1 : test
   | con2 : Bool → test
   | con3 : Nat → test
-deriving Serialize
+deriving Serialize, Lean.ToJson
+
+inductive Vector : Nat → Type where
+  | nil  : Vector 0
+  | cons : Bool → {n : Nat} → Vector n → Vector (n+1)
+deriving Lean.ToJson
 
 open test
 
